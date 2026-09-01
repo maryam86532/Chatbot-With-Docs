@@ -1,3 +1,4 @@
+[RAG Chatbot.html](https://github.com/user-attachments/files/31685925/RAG.Chatbot.html)
 # RAG Chatbot
 
 A **retrieval-augmented generation (RAG)** chatbot built on FastAPI, LangChain,
