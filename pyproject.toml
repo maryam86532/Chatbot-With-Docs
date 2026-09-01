@@ -1,0 +1,21 @@
+[project]
+name = "rag-chatbot"
+version = "1.0.0"
+description = "A RAG-powered chatbot built with FastAPI, LangChain, Google Gemini, FAISS, and SQLite."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[all]",
+    "uvicorn[standard]",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "langchain",
+    "langchain-community",
+    "langchain-google-genai",
+    "faiss-cpu",
+    "pypdf",
+    "python-docx",
+]
+
+[tool.uv]
+package = false
