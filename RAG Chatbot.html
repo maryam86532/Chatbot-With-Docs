@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<!-- saved from url=(0022)http://127.0.0.1:8000/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Chatbot</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --bg-sidebar: #ffffff;
+    --bg-chat: #f5f6f8;
+    --panel: #ffffff;
+    --panel-2: #f0f1f4;
+    --border: #e3e5ea;
+    --text: #1c1e26;
+    --text-dim: #707787;
+    --accent: #4361ee;
+    --accent-soft: #eef1ff;
+    --success: #22a06b;
+    --danger: #e5484d;
+    --user-bubble: #4361ee;
+    --bot-bubble: #ffffff;
+    --radius: 14px;
+    --shadow: 0 6px 24px rgba(20, 24, 40, 0.08);
+    --sidebar-w: 280px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-chat);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .app { display: flex; height: 100vh; width: 100vw; }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    z-index: 5;
+  }
+  .sidebar-header {
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand-logo {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, #4361ee, #7b5bf2);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 18px; flex-shrink: 0;
+  }
+  .brand h1 { font-size: 15.5px; font-weight: 650; letter-spacing: -0.2px; }
+  .brand p { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+
+  .sidebar-actions { padding: 14px 16px 8px; }
+  .new-chat-btn {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--panel); color: var(--text);
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: border-color .18s, background .18s;
+  }
+  .new-chat-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+  .sessions-label {
+    padding: 14px 20px 6px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .6px; color: var(--text-dim);
+  }
+  .sessions { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
+  .session-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    margin-bottom: 2px; color: var(--text-dim);
+    transition: background .15s, color .15s;
+  }
+  .session-item:hover { background: var(--panel-2); color: var(--text); }
+  .session-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .session-item .s-icon { font-size: 14px; flex-shrink: 0; }
+  .session-item .s-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
+  .session-item .s-del {
+    visibility: hidden; background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 14px; padding: 2px;
+  }
+  .session-item:hover .s-del { visibility: visible; }
+  .session-item .s-del:hover { color: var(--danger); }
+
+  .sidebar-footer { border-top: 1px solid var(--border); padding: 14px 16px; }
+  .api-key-box label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+  .api-key-box input {
+    width: 100%; padding: 9px 11px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+    font-size: 13px; transition: border-color .18s;
+  }
+  .api-key-box input:focus { outline: none; border-color: var(--accent); }
+
+  /* ===== Main chat ===== */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+
+  .chat-header {
+    height: 60px; padding: 12px 20px; flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,.8); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .chat-header .title {
+    font-weight: 600; font-size: 15px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .chip-note {
+    font-size: 12px; color: var(--text-dim);
+    border: 1px solid var(--border); background: var(--panel);
+    padding: 5px 11px; border-radius: 20px;
+  }
+  .menu-toggle {
+    display: none; background: none; border: 1px solid var(--border);
+    border-radius: 10px; width: 40px; height: 38px; cursor: pointer; font-size: 17px; color: var(--text);
+  }
+
+  .messages {
+    flex: 1; overflow-y: auto; padding: 24px 20px;
+    display: flex; flex-direction: column; gap: 18px;
+    scroll-behavior: smooth;
+  }
+  .messages-inner { max-width: 820px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  /* Welcome screen */
+  .welcome { margin: 6vh auto 0; max-width: 560px; text-align: center; padding: 20px; }
+  .welcome .w-logo {
+    width: 62px; height: 62px; border-radius: 18px; margin: 0 auto 18px;
+    background: linear-gradient(135deg, #4361ee, #7b5bf2);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 30px; box-shadow: 0 10px 30px rgba(67,97,238,.28);
+  }
+  .welcome h2 { font-size: 23px; font-weight: 650; letter-spacing: -0.3px; margin-bottom: 8px; }
+  .welcome p { color: var(--text-dim); font-size: 14.5px; margin-bottom: 24px; }
+  .examples { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .example {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 14px; text-align: left; font-size: 13.5px; cursor: pointer; color: var(--text);
+    transition: border-color .18s, background .18s;
+  }
+  .example:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .example span { font-size: 16px; margin-right: 8px; }
+
+  /* Message bubbles */
+  .msg { display: flex; gap: 12px; max-width: 100%; }
+  .msg.user { justify-content: flex-end; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .msg.user .avatar { background: var(--accent); color: #fff; order: 2; }
+  .msg.bot .avatar { background: var(--panel-2); border: 1px solid var(--border); }
+  .bubble {
+    max-width: 78%; padding: 12px 16px; border-radius: var(--radius);
+    font-size: 14.5px; line-height: 1.6; word-break: break-word; white-space: pre-wrap;
+  }
+  .msg.user .bubble { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot .bubble { background: var(--bot-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: var(--shadow); }
+  .sources { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); font-size: 12px; }
+  .msg.bot .sources { color: var(--text-dim); }
+  .sources .src {
+    display: inline-block; background: var(--panel-2); border-radius: 6px;
+    padding: 2px 8px; margin: 3px 3px 0 0; font-size: 11.5px;
+  }
+
+  .typing-indicator { display: flex; gap: 5px; align-items: center; padding: 4px 0; }
+  .typing-indicator span {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+    opacity: .35; animation: blink 1.3s infinite;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100% {opacity:.25} 40% {opacity:1} }
+
+  .msg-error .bubble { border-color: #f3c1c3; background: #fdf0f0; }
+
+  /* ===== Composer ===== */
+  .composer { padding: 12px 20px 16px; flex-shrink: 0; }
+  .composer-inner {
+    max-width: 820px; margin: 0 auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .attachments {
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px 0;
+  }
+  .attachment {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 6px 10px; font-size: 12.5px; max-width: 200px;
+  }
+  .attachment .thumb {
+    width: 22px; height: 22px; border-radius: 5px; object-fit: cover;
+    background: var(--accent-soft); display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+  .attachment .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .attachment .remove {
+    background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 2px;
+  }
+  .attachment .remove:hover { color: var(--danger); }
+  .attachment-note { width: 100%; font-size: 11.5px; color: var(--text-dim); }
+
+  .chat-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .chat-img {
+    max-width: 240px; max-height: 240px; border-radius: 10px;
+    border: 1px solid var(--border); margin-top: 6px; object-fit: cover;
+  }
+
+  .input-row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; }
+  textarea {
+    flex: 1; resize: none; border: none; outline: none; background: transparent;
+    color: var(--text); font-size: 14.5px; font-family: inherit; max-height: 140px;
+    line-height: 1.5; padding: 6px 2px;
+  }
+  textarea::placeholder { color: #a5adbd; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 11px; border: 1px solid transparent;
+    background: transparent; color: var(--text-dim); cursor: pointer; font-size: 19px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: background .15s, color .15s;
+  }
+  .icon-btn:hover { background: var(--panel-2); color: var(--text); }
+  .send-btn {
+    width: 40px; height: 40px; border-radius: 11px; border: none; cursor: pointer;
+    background: var(--accent); color: #fff; font-size: 17px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: opacity .18s, transform .12s;
+  }
+  .send-btn:hover { opacity: .9; }
+  .send-btn:active { transform: scale(.95); }
+  .send-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .composer-hint { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 8px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 18px; right: 18px; z-index: 1000;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 12px 18px; border-radius: 12px; box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(-8px); transition: all .25s; font-size: 13.5px; max-width: 320px;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { border-color: #f3c1c3; color: #9c2b30; }
+  .toast.success { border-color: #bfe6d4; color: #1a744b; }
+
+  /* Sidebar overlay for mobile */
+  .overlay {
+    display: none; position: fixed; inset: 0; background: rgba(20,24,40,.4);
+    z-index: 4; opacity: 0; transition: opacity .2s;
+  }
+  .overlay.show { display: block; opacity: 1; }
+
+  ::-webkit-scrollbar { width: 9px; }
+  ::-webkit-scrollbar-thumb { background: #d3d7e0; border-radius: 9px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #b9bfcc; background-clip: content-box; }
+
+  .empty-hint { text-align: center; color: var(--text-dim); font-size: 13px; padding: 30px; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 820px) {
+    .sidebar.wide {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 6;
+      transform: translateX(-105%); transition: transform .22s ease;
+      box-shadow: var(--shadow);
+    }
+    .sidebar.wide.open { transform: translateX(0); }
+    .menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+    body.sidebar-open { overflow: hidden; }
+    .messages { padding: 18px 12px; }
+    .composer { padding: 10px 10px 12px; }
+    .bubble { max-width: 88%; }
+    .examples { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar wide" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-logo">🤖</div>
+        <div>
+          <h1>RAG Chatbot</h1>
+          <p>Gemini + FAISS knowledge base</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="new-chat-btn" id="newChatBtn">＋ New chat</button>
+    </div>
+
+    <div class="sessions-label">Chat history</div>
+    <div class="sessions" id="sessions"><div class="session-item active"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">browsercheck</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">final_img</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">final_pdf</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">final_text</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgtr</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgfinal2</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdft</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgt</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">text</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdft</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgt</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">text</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdft</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgt</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">text</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdft</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgt</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">text</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">imgt</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdft</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">text</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">image test</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdf test3</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">pdf test2</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">text test</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div><div class="session-item"><span class="s-icon">💬</span><span class="s-title">New chat</span><button class="s-del" title="Delete">🗑</button></div></div>
+
+    <div class="sidebar-footer">
+      <div class="api-key-box">
+        <label for="apiKey">API key (Bearer token)</label>
+        <input type="password" id="apiKey" placeholder="Paste your API key" autocomplete="off">
+      </div>
+    </div>
+  </aside>
+
+  <div class="overlay" id="overlay"></div>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="chat-header">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <button class="menu-toggle" id="menuBtn">☰</button>
+        <div class="title" id="chatTitle">New chat</div>
+      </div>
+      <div class="header-actions">
+        <span class="chip-note" id="kbStatus" style="color: var(--success);">✓ Knowledge base ready</span>
+      </div>
+    </header>
+
+    <div class="messages" id="messages">
+      <div class="messages-inner" id="messagesInner"><div class="msg user"><div class="avatar">🙂</div><div class="bubble">hi how are you</div></div><div class="msg bot"><div class="avatar">🤖</div><div class="bubble">Hi there! I'm doing well, thank you for asking. How can I help you today?</div></div><div class="msg user"><div class="avatar">🙂</div><div class="bubble">hi</div></div><div class="msg bot"><div class="avatar">🤖</div><div class="bubble">Hi again! What's on your mind?</div></div><div class="msg user"><div class="avatar">🙂</div><div class="bubble">hi</div></div><div class="msg bot msg-error"><div class="avatar">🤖</div><div class="bubble">⚠️ Failed to fetch</div></div></div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="attachments" id="attachments"></div>
+        <div class="input-row">
+          <button class="icon-btn" id="attachBtn" title="Attach PDF or image">📎</button>
+          <textarea id="input" rows="1" placeholder="Ask a question… (Enter to send, Shift+Enter for new line)" style="height: auto;"></textarea>
+          <button class="send-btn" id="sendBtn" title="Send">➤</button>
+        </div>
+      </div>
+      <div class="composer-hint">Answers use your uploaded documents when available</div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".pdf,.txt,.md,.docx,image/*" multiple="" hidden="">
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- Elements ----
+  const $ = (id) => document.getElementById(id);
+  const messagesEl = $('messages');
+  const messagesInner = $('messagesInner');
+  const ta = $('input');
+  const apiUrl = '';
+
+  // ---- State ----
+  let currentSession = null;
+  let busy = false;
+  const attachments = []; // {name, ext, isImage, preview(dataURL|null)}
+
+  const KEY_STORE = 'rag_api_key';
+  const SESSION_STORE = 'rag_session';
+  const UPLOAD_EXTS = ['.pdf', '.txt', '.md', '.docx'];
+  const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
+
+  // ---- Utilities ----
+  function getApiKey() { return $('apiKey').value.trim(); }
+
+  function authHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    const key = getApiKey();
+    if (key) h['Authorization'] = 'Bearer ' + key;
+    return h;
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Render message content, converting ![alt](url) image references into <img>.
+  function renderMessageText(text) {
+    const esc = escapeHtml(text);
+    return esc.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g,
+      '<img class="chat-img" src="$2" alt="' + escapeHtml('$1') + '">');
+  }
+
+  function renderUserImages(images) {
+    const last = messagesInner.querySelector('.msg.user:last-of-type .bubble');
+    if (!last) return;
+    const html = images.map(a => {
+      return '<img class="chat-img" src="' + a.preview + '" alt="' + escapeHtml(a.name) + '">';
+    }).join('');
+    last.insertAdjacentHTML('beforeend', '<div class="chat-imgs">' + html + '</div>');
+    scrollBottom();
+  }
+
+  function toast(msg, type) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (type || '');
+    clearTimeout(t._tm);
+    t._tm = setTimeout(() => { t.className = 'toast'; }, 3600);
+  }
+
+  function extOf(name) {
+    const i = name.lastIndexOf('.');
+    return i >= 0 ? name.slice(i).toLowerCase() : '';
+  }
+  function isImage(name) { return IMAGE_EXTS.includes(extOf(name)); }
+  function isUploadable(name) { return UPLOAD_EXTS.includes(extOf(name)); }
+
+  // ---- Persist API key ----
+  function saveKey() { localStorage.setItem(KEY_STORE, getApiKey()); }
+  $('apiKey').value = localStorage.getItem(KEY_STORE) || '';
+  $('apiKey').addEventListener('input', saveKey);
+
+  // ---- Sessions ----
+  async function loadSessions() {
+    try {
+      const r = await fetch(apiUrl + '/chat/sessions', { headers: authHeaders() });
+      if (!r.ok) throw new Error((await r.json()).detail || 'Failed to load sessions');
+      const data = await r.json();
+      renderSessions(data.sessions);
+    } catch (e) {
+      if (!currentSession && !getApiKey()) toast('Enter your API key to begin', 'error');
+    }
+  }
+
+  function renderSessions(sessions) {
+    const box = $('sessions');
+    box.innerHTML = '';
+    if (!sessions.length) {
+      box.innerHTML = '<div class="empty-hint">No conversations yet</div>';
+      return;
+    }
+    sessions.forEach(s => {
+      const el = document.createElement('div');
+      el.className = 'session-item' + (s.id === currentSession ? ' active' : '');
+      el.innerHTML =
+        '<span class="s-icon">💬</span>' +
+        '<span class="s-title"></span>' +
+        '<button class="s-del" title="Delete">🗑</button>';
+      el.querySelector('.s-title').textContent = s.title || 'New chat';
+      el.addEventListener('click', () => openSession(s.id));
+      el.querySelector('.s-del').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await deleteSession(s.id);
+      });
+      box.appendChild(el);
+    });
+  }
+
+  function showWelcome() {
+    messagesInner.innerHTML = '';
+    const w = document.createElement('div');
+    w.className = 'welcome';
+    w.innerHTML =
+      '<div class="w-logo">🤖</div>' +
+      '<h2>How can I help you today?</h2>' +
+      '<p>Ask about your uploaded documents, or start a conversation. Attach a PDF for retrieval-augmented answers, or an image for visual analysis by Gemini.</p>' +
+      '<div class="examples">' +
+        '<div class="example" data-q="What is RAG and how does it work?"><span>📚</span>Explain RAG simply</div>' +
+        '<div class="example" data-q="Summarize the key points of my knowledge base"><span>📄</span>Summarize my documents</div>' +
+        '<div class="example" data-q="List the concepts covered in my uploaded files"><span>🧠</span>What topics are covered?</div>' +
+        '<div class="example" data-q="Give me a quick overview of the project"><span>🚀</span>Project overview</div>' +
+      '</div>';
+    w.querySelectorAll('.example').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ta.value = btn.getAttribute('data-q');
+        ta.style.height = 'auto';
+        ta.focus();
+        send();
+      });
+    });
+    messagesInner.appendChild(w);
+  }
+
+  async function newChat() {
+    if (busy) return;
+    try {
+      const r = await fetch(apiUrl + '/chat/sessions', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ title: 'New chat' })
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || 'Failed to create session');
+      const data = await r.json();
+      currentSession = data.session_id;
+      localStorage.setItem(SESSION_STORE, currentSession);
+      $('chatTitle').textContent = 'New chat';
+      renderSessions([{ id: currentSession, title: 'New chat' }]);
+      showWelcome();
+      loadKbStatus();
+    } catch (e) {
+      toast(e.message || 'Could not create a session', 'error');
+    }
+  }
+
+  async function openSession(id) {
+    currentSession = id;
+    localStorage.setItem(SESSION_STORE, id);
+    try {
+      const r = await fetch(apiUrl + '/chat/sessions/' + id + '/messages', { headers: authHeaders() });
+      if (!r.ok) throw new Error((await r.json()).detail || 'Failed to load messages');
+      const data = await r.json();
+      messagesInner.innerHTML = '';
+
+      const msgs = data.messages || [];
+      if (!msgs.length) {
+        $('chatTitle').textContent = 'New chat';
+        showWelcome();
+      } else {
+        $('chatTitle').textContent = msgs[0].content.slice(0, 42) || 'Chat';
+        msgs.forEach(m => addMessage(m.role === 'user' ? 'user' : 'bot', m.content));
+      }
+      loadKbStatus();
+    } catch (e) {
+      toast(e.message || 'Failed to open session', 'error');
+    }
+  }
+
+  async function refreshSessionList() {
+    try {
+      const r = await fetch(apiUrl + '/chat/sessions', { headers: authHeaders() });
+      const data = await r.json();
+      renderSessions(data.sessions);
+    } catch (e) { /* ignore */ }
+  }
+
+  async function deleteSession(id) {
+    try {
+      const r = await fetch(apiUrl + '/chat/sessions/' + id, { method: 'DELETE', headers: authHeaders() });
+      if (!r.ok) throw new Error('Delete failed');
+      if (currentSession === id) { currentSession = null; messagesInner.innerHTML = ''; showWelcome(); }
+      loadSessions();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ---- Messages ----
+  function addMessage(role, text, sources, isError) {
+    const existing = messagesInner.querySelector('.welcome');
+    if (existing) existing.remove();
+
+    const el = document.createElement('div');
+    el.className = 'msg ' + role + (isError ? ' msg-error' : '');
+    const avatar = role === 'user' ? '🙂' : '🤖';
+    let sourcesHtml = '';
+    if (sources && sources.length) {
+      sourcesHtml = '<div class="sources">Sources: ' +
+        sources.map(s => '<span class="src">📄 ' + escapeHtml(s) + '</span>').join('') +
+        '</div>';
+    }
+    el.innerHTML =
+      '<div class="avatar">' + avatar + '</div>' +
+      '<div class="bubble">' + renderMessageText(text) + sourcesHtml + '</div>';
+    messagesInner.appendChild(el);
+    scrollBottom();
+    return el;
+  }
+
+  function showTyping() {
+    const el = document.createElement('div');
+    el.className = 'msg bot';
+    el.id = 'typing';
+    el.innerHTML =
+      '<div class="avatar">🤖</div>' +
+      '<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
+    messagesInner.appendChild(el);
+    scrollBottom();
+  }
+  function removeTyping() { const t = $('typing'); if (t) t.remove(); }
+  function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+  // ---- Send ----
+  async function send() {
+    const text = ta.value.trim();
+    if ((!text && attachments.length === 0) || busy) return;
+    if (!currentSession) { toast('Start or open a chat first', 'error'); return; }
+    if (!getApiKey()) { toast('Enter your API key in the sidebar', 'error'); return; }
+
+    busy = true;
+    $('sendBtn').disabled = true;
+
+    const images = attachments.filter(a => a.isImage);
+    const uploadables = attachments.filter(a => a.isUploadable && !a.uploaded);
+
+    // 1) Upload document attachments (PDF/doc/txt/md) to the knowledge base first.
+    for (const a of uploadables) {
+      await uploadAttachment(a);
+    }
+
+    // 2) Build the ask request. If images are present, send them with the question
+    //    via multipart so Gemini can analyse them (vision). Otherwise use JSON.
+    try {
+      if (text || images.length) {
+        const prompt = text || 'Describe this image.';
+        if (text) addMessage('user', text);
+        showTyping();
+
+        let r;
+        if (images.length) {
+          const fd = new FormData();
+          fd.append('session_id', currentSession);
+          fd.append('message', prompt);
+          images.forEach(a => fd.append('images', a.file));
+          r = await fetch(apiUrl + '/chat/ask', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + getApiKey() },
+            body: fd
+          });
+          // Render the sent image previews in the user message.
+          renderUserImages(images);
+        } else {
+          r = await fetch(apiUrl + '/chat/ask', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ session_id: currentSession, message: prompt })
+          });
+        }
+
+        removeTyping();
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || 'Request failed');
+        addMessage('bot', data.answer, data.sources);
+      }
+    } catch (e) {
+      removeTyping();
+      addMessage('bot', '⚠️ ' + (e.message || 'Something went wrong'), null, true);
+    }
+
+    // Clear composer + attachments after sending.
+    ta.value = '';
+    ta.style.height = 'auto';
+    attachments.length = 0;
+    renderAttachments();
+
+    busy = false;
+    $('sendBtn').disabled = false;
+    ta.focus();
+
+    // Refresh session list (title/order may have changed) + kb status.
+    refreshSessionList();
+    loadKbStatus();
+  }
+
+  // ---- Attachments ----
+  function renderAttachments() {
+    const box = $('attachments');
+    box.innerHTML = '';
+    if (!attachments.length) return;
+
+    attachments.forEach((a, idx) => {
+      const el = document.createElement('div');
+      el.className = 'attachment';
+      let thumb = '';
+      if (a.isImage && a.preview) {
+        thumb = '<img class="thumb" src="' + a.preview + '" alt="">';
+      } else {
+        thumb = '<span class="thumb">📄</span>';
+      }
+      el.innerHTML =
+        thumb +
+        '<span class="name" title="' + escapeHtml(a.name) + '">' + escapeHtml(a.name) + '</span>' +
+        '<button class="remove" title="Remove">✕</button>';
+      el.querySelector('.remove').addEventListener('click', () => {
+        attachments.splice(idx, 1);
+        renderAttachments();
+      });
+      box.appendChild(el);
+    });
+
+    if (attachments.some(a => a.isImage)) {
+      const n = document.createElement('div');
+      n.className = 'attachment-note';
+      n.textContent = 'Image will be analysed by Gemini with your question.';
+      box.appendChild(n);
+    }
+  }
+
+  function fileToDataURL(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleFiles(files) {
+    for (const file of Array.from(files)) {
+      const name = file.name;
+      const img = isImage(name);
+      const preview = img ? await fileToDataURL(file) : null;
+      attachments.push({
+        name,
+        ext: extOf(name),
+        isImage: img,
+        isUploadable: isUploadable(name),
+        uploaded: false, // images are sent with the question; docs via /documents
+        file,
+        preview
+      });
+    }
+    renderAttachments();
+  }
+
+  async function uploadAttachment(a) {
+    if (a.uploaded) return a;
+    const fd = new FormData();
+    fd.append('file', a.file);
+    try {
+      const r = await fetch(apiUrl + '/chat/documents', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + getApiKey() },
+        body: fd
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || 'Upload failed');
+      a.uploaded = true;
+      toast('✓ ' + a.name + ' added to knowledge base', 'success');
+      loadKbStatus();
+    } catch (e) {
+      toast('Upload failed: ' + e.message, 'error');
+    }
+    return a;
+  }
+
+  $('attachBtn').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+    e.target.value = '';
+  });
+
+  // ---- Knowledge base status ----
+  async function loadKbStatus() {
+    try {
+      const r = await fetch(apiUrl + '/server_info/status', { headers: authHeaders() });
+      const data = await r.json();
+      const has = data.vector_store_initialized === true;
+      $('kbStatus').textContent = has ? '✓ Knowledge base ready' : 'No documents';
+      $('kbStatus').style.color = has ? 'var(--success)' : '';
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---- Input handling ----
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  });
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  $('sendBtn').addEventListener('click', send);
+  $('newChatBtn').addEventListener('click', newChat);
+
+  // ---- Mobile sidebar ----
+  const sidebar = $('sidebar');
+  const overlay = $('overlay');
+  function setSidebar(open) {
+    sidebar.classList.toggle('open', open);
+    overlay.classList.toggle('show', open);
+    document.body.classList.toggle('sidebar-open', open);
+  }
+  $('menuBtn').addEventListener('click', () => setSidebar(true));
+  overlay.addEventListener('click', () => setSidebar(false));
+  // Close sidebar when a session is selected on mobile
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.session-item')) setSidebar(false);
+  });
+
+  // ---- Init ----
+  loadSessions();
+  loadKbStatus();
+  const saved = localStorage.getItem(SESSION_STORE);
+  if (saved) { openSession(saved); } else { showWelcome(); }
+})();
+</script>
+
+
+</body></html>
